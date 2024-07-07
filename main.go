@@ -421,9 +421,55 @@ func exportProduct() {
 
 func startServer() {
 	fmt.Println("\n----------------------- Lancer un serveur Http avec une page web -----------------------\n")
-	http.HandleFunc("/", homeHandler)
-	fmt.Println("Serveur en écoute sur http://localhost:8080/")
-	http.ListenAndServe(":8080", nil)
+
+	fmt.Println("requete get pour obtenir la liste des produits (G) ou lancer un serveur http avec une page web (W) : ")
+	reader := bufio.NewReader(os.Stdin)
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(choice)
+
+	if choice == "G" || choice == "g" {
+
+		http.HandleFunc("/products", listProductHandler)
+		fmt.Println("Serveur en écoute sur http://localhost:8080/products")
+		http.ListenAndServe(":8080", nil)
+
+	} else if choice == "W" || choice == "w" {
+
+		http.HandleFunc("/", homeHandler)
+		fmt.Println("Serveur en écoute sur http://localhost:8080/")
+		http.ListenAndServe(":8080", nil)
+
+	} else {
+		fmt.Println("Choix invalide. Retour au menu principal.")
+		main()
+	}
+}
+
+func listProductHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT id, name, description, price FROM products")
+	if err != nil {
+		http.Error(w, "Erreur lors de la récupération des produits", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var products []string
+	for rows.Next() {
+		var id int
+		var name, description string
+		var price float64
+		err := rows.Scan(&id, &name, &description, &price)
+		if err != nil {
+			http.Error(w, "Erreur lors de la lecture des données", http.StatusInternalServerError)
+			return
+		}
+		products = append(products, fmt.Sprintf("ID: %d, Nom: %s, Description: %s, Prix: %.2f€", id, name, description, price))
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	for _, product := range products {
+		fmt.Fprintln(w, product)
+	}
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
